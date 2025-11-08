@@ -8,10 +8,10 @@ import { auth, db } from "../firebase";
 /*
   Props:
    - children: the protected element to render
-   - requiredRole: optional string "student" or "faculty" to enforce role-based access
+   - requiredRole: optional string "student" or "faculty" or an array ["student","faculty"] to enforce role-based access
 
   Behavior:
-   - While checking, shows a simple "Loading..." text (you can replace with spinner)
+   - While checking, shows a simple "Loading..." text
    - If not authenticated -> redirect to '/'
    - If requiredRole provided and user role does not match -> redirect to '/'
 */
@@ -28,6 +28,7 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
         return;
       }
 
+      // If no role restriction, allow any authenticated user
       if (!requiredRole) {
         setAllowed(true);
         setChecking(false);
@@ -37,7 +38,13 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         const role = snap.exists() ? snap.data().role : null;
-        setAllowed(role === requiredRole);
+
+        // Support either a single role string or an array of roles
+        const hasRequiredRole = Array.isArray(requiredRole)
+          ? requiredRole.includes(role)
+          : role === requiredRole;
+
+        setAllowed(!!hasRequiredRole);
       } catch (err) {
         console.error("ProtectedRoute error:", err);
         setAllowed(false);
@@ -49,7 +56,7 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     return () => unsub();
   }, [requiredRole]);
 
-  if (checking) return <div style={{padding:20}}>Loading...</div>;
+  if (checking) return <div style={{ padding: 20 }}>Loading...</div>;
   if (!allowed) return <Navigate to="/" replace />;
   return children;
 }
